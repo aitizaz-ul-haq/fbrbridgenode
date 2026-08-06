@@ -53,12 +53,20 @@ function buildMockResult(action: BridgeAction): FbrCallResult {
   };
 }
 
-async function callFbr(action: BridgeAction, invoice: FbrInvoice): Promise<FbrCallResult> {
+async function callFbr(
+  action: BridgeAction,
+  invoice: FbrInvoice,
+  overrideToken?: string,
+): Promise<FbrCallResult> {
   if (env.mockMode) {
     return buildMockResult(action);
   }
 
-  if (!env.fbrSandboxToken) {
+  // Per-company token (sent by the main app) takes precedence over the bridge's
+  // default env token so each seller submits under its own FBR-issued token.
+  const token = overrideToken?.trim() || env.fbrSandboxToken;
+
+  if (!token) {
     return {
       ok: false,
       httpStatus: 500,
@@ -73,7 +81,7 @@ async function callFbr(action: BridgeAction, invoice: FbrInvoice): Promise<FbrCa
   try {
     const response = await getClient().post(path, invoice, {
       headers: {
-        Authorization: `Bearer ${env.fbrSandboxToken}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -144,12 +152,12 @@ function mapAxiosError(error: unknown): FbrCallResult {
   };
 }
 
-export function validateInvoice(invoice: FbrInvoice): Promise<FbrCallResult> {
-  return callFbr('validate', invoice);
+export function validateInvoice(invoice: FbrInvoice, overrideToken?: string): Promise<FbrCallResult> {
+  return callFbr('validate', invoice, overrideToken);
 }
 
-export function submitInvoice(invoice: FbrInvoice): Promise<FbrCallResult> {
-  return callFbr('submit', invoice);
+export function submitInvoice(invoice: FbrInvoice, overrideToken?: string): Promise<FbrCallResult> {
+  return callFbr('submit', invoice, overrideToken);
 }
 
 /**

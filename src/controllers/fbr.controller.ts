@@ -12,7 +12,10 @@ import {
 import { getCachedResponse, setCachedResponse } from '../utils/idempotency.js';
 import { env } from '../config/env.js';
 
-type FbrCaller = (invoice: Parameters<typeof validateInvoice>[0]) => Promise<FbrCallResult>;
+type FbrCaller = (
+  invoice: Parameters<typeof validateInvoice>[0],
+  overrideToken?: string,
+) => Promise<FbrCallResult>;
 
 async function handleAction(
   action: BridgeAction,
@@ -42,6 +45,10 @@ async function handleAction(
 
   const { submissionId, invoice } = parsed.data;
 
+  // Optional per-company FBR token; falls back to the bridge env token when absent.
+  const overrideTokenRaw = req.header('X-FBR-Token');
+  const overrideToken = overrideTokenRaw?.trim() || undefined;
+
   // 2. Development-only idempotency replay protection.
   if (req.idempotencyKey) {
     const cached = getCachedResponse(action, req.idempotencyKey);
@@ -68,7 +75,7 @@ async function handleAction(
   );
 
   // 3. Forward ONLY the invoice object to FBR.
-  const result = await caller(invoice);
+  const result = await caller(invoice, overrideToken);
 
   // 4. Build a consistent envelope preserving the full FBR response.
   let envelope: BridgeEnvelope;
