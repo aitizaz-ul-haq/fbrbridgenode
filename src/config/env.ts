@@ -56,6 +56,10 @@ const fbrSandboxToken = mockMode
   ? (process.env.FBR_SANDBOX_TOKEN ?? '')
   : requireString('FBR_SANDBOX_TOKEN');
 
+// The production token is optional so the bridge can run with sandbox only.
+// A production request without a resolvable token yields FBR_TOKEN_MISSING.
+const fbrProductionToken = process.env.FBR_PRODUCTION_TOKEN ?? '';
+
 export const env = {
   nodeEnv,
   isProduction,
@@ -64,6 +68,7 @@ export const env = {
 
   fbrBaseUrl: requireString('FBR_BASE_URL', 'https://gw.fbr.gov.pk/di_data/v1/di'),
   fbrSandboxToken,
+  fbrProductionToken,
 
   bridgeApiKey: requireString('BRIDGE_API_KEY'),
   allowedOrigins,
@@ -73,8 +78,9 @@ export const env = {
 
   mockMode,
 
-  // Reported in the /health response and envelopes.
-  environmentLabel: 'sandbox' as const,
+  // Environment used when a request does not specify `X-FBR-Environment`.
+  // Reported in the /health response.
+  defaultEnvironment: 'sandbox' as const,
 } as const;
 
 export type Env = typeof env;

@@ -1,10 +1,20 @@
 import axios, { AxiosError, type AxiosInstance } from 'axios';
 import { env } from '../config/env.js';
-import type { BridgeAction, FbrInvoice } from '../types/invoice.js';
+import type { BridgeAction, FbrEnvironment, FbrInvoice } from '../types/invoice.js';
 import { ErrorCodes, type ErrorCode } from '../utils/response.js';
 
-const VALIDATE_PATH = '/validateinvoicedata_sb';
-const SUBMIT_PATH = '/postinvoicedata_sb';
+// FBR exposes distinct endpoints per environment. Sandbox paths carry the `_sb`
+// suffix; production paths do not. Both share the same base URL.
+const FBR_PATHS: Record<FbrEnvironment, Record<BridgeAction, string>> = {
+  sandbox: {
+    validate: '/validateinvoicedata_sb',
+    submit: '/postinvoicedata_sb',
+  },
+  production: {
+    validate: '/validateinvoicedata',
+    submit: '/postinvoicedata',
+  },
+};
 
 /**
  * Result of an FBR call. The bridge always preserves the raw FBR response body
@@ -56,6 +66,7 @@ function buildMockResult(action: BridgeAction): FbrCallResult {
 async function callFbr(
   action: BridgeAction,
   invoice: FbrInvoice,
+  environment: FbrEnvironment,
   overrideToken?: string,
 ): Promise<FbrCallResult> {
   if (env.mockMode) {
@@ -64,7 +75,10 @@ async function callFbr(
 
   // Per-company token (sent by the main app) takes precedence over the bridge's
   // default env token so each seller submits under its own FBR-issued token.
-  const token = overrideToken?.trim() || env.fbrSandboxToken;
+  // The default token is chosen to match the target environment.
+  const defaultToken =
+    environment === 'production' ? env.fbrProductionToken : env.fbrSandboxToken;
+  const token = overrideToken?.trim() || defaultToken;
 
   if (!token) {
     return {
@@ -72,11 +86,11 @@ async function callFbr(
       httpStatus: 500,
       fbrResponse: {},
       errorCode: ErrorCodes.FBR_TOKEN_MISSING,
-      errorMessage: 'FBR sandbox token is not configured.',
+      errorMessage: `FBR ${environment} token is not configured.`,
     };
   }
 
-  const path = action === 'validate' ? VALIDATE_PATH : SUBMIT_PATH;
+  const path = FBR_PATHS[environment][action];
 
   try {
     const response = await getClient().post(path, invoice, {
@@ -152,12 +166,20 @@ function mapAxiosError(error: unknown): FbrCallResult {
   };
 }
 
-export function validateInvoice(invoice: FbrInvoice, overrideToken?: string): Promise<FbrCallResult> {
-  return callFbr('validate', invoice, overrideToken);
+export function validateInvoice(
+  invoice: FbrInvoice,
+  environment: FbrEnvironment = 'sandbox',
+  overrideToken?: string,
+): Promise<FbrCallResult> {
+  return callFbr('validate', invoice, environment, overrideToken);
 }
 
-export function submitInvoice(invoice: FbrInvoice, overrideToken?: string): Promise<FbrCallResult> {
-  return callFbr('submit', invoice, overrideToken);
+export function submitInvoice(
+  invoice: FbrInvoice,
+  environment: FbrEnvironment = 'sandbox',
+  overrideToken?: string,
+): Promise<FbrCallResult> {
+  return callFbr('submit', invoice, environment, overrideToken);
 }
 
 /**

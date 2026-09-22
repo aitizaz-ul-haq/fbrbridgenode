@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { bridgeRequestSchema } from '../schemas/invoice.schema.js';
 import { submitInvoice, validateInvoice, type FbrCallResult } from '../services/fbr.service.js';
-import type { BridgeAction } from '../types/invoice.js';
+import type { BridgeAction, FbrEnvironment } from '../types/invoice.js';
 import { logger, maskIdentifier } from '../utils/logger.js';
 import {
   buildErrorEnvelope,
@@ -14,8 +14,25 @@ import { env } from '../config/env.js';
 
 type FbrCaller = (
   invoice: Parameters<typeof validateInvoice>[0],
+  environment: FbrEnvironment,
   overrideToken?: string,
 ) => Promise<FbrCallResult>;
+
+/**
+ * Resolve the target FBR environment from the `X-FBR-Environment` header.
+ * Defaults to sandbox when absent so existing callers are unaffected; any
+ * unrecognized value also falls back to the default rather than erroring.
+ */
+function resolveEnvironment(req: Request): FbrEnvironment {
+  const raw = req.header('X-FBR-Environment')?.trim().toLowerCase();
+  if (raw === 'production') {
+    return 'production';
+  }
+  if (raw === 'sandbox') {
+    return 'sandbox';
+  }
+  return env.defaultEnvironment;
+}
 
 async function handleAction(
   action: BridgeAction,
@@ -29,6 +46,7 @@ async function handleAction(
     const envelope = buildErrorEnvelope({
       requestId: req.requestId,
       action,
+      environment: resolveEnvironment(req),
       httpStatus: 400,
       code: ErrorCodes.INVALID_REQUEST,
       message: 'Invoice payload failed local validation.',
@@ -44,6 +62,9 @@ async function handleAction(
   }
 
   const { submissionId, invoice } = parsed.data;
+
+  // Target environment (sandbox|production) chosen by the main app per request.
+  const environment = resolveEnvironment(req);
 
   // Optional per-company FBR token; falls back to the bridge env token when absent.
   const overrideTokenRaw = req.header('X-FBR-Token');
@@ -67,6 +88,7 @@ async function handleAction(
       requestId: req.requestId,
       submissionId: submissionId ?? null,
       action,
+      environment,
       mock: env.mockMode,
       seller: maskIdentifier(invoice.sellerNTNCNIC),
       buyer: maskIdentifier(invoice.buyerNTNCNIC),
@@ -75,7 +97,7 @@ async function handleAction(
   );
 
   // 3. Forward ONLY the invoice object to FBR.
-  const result = await caller(invoice, overrideToken);
+  const result = await caller(invoice, environment, overrideToken);
 
   // 4. Build a consistent envelope preserving the full FBR response.
   let envelope: BridgeEnvelope;
@@ -84,6 +106,7 @@ async function handleAction(
       requestId: req.requestId,
       submissionId: submissionId ?? null,
       action,
+      environment,
       httpStatus: result.httpStatus,
       fbrResponse: result.fbrResponse,
       mock: result.mock,
@@ -93,6 +116,7 @@ async function handleAction(
       requestId: req.requestId,
       submissionId: submissionId ?? null,
       action,
+      environment,
       httpStatus: result.httpStatus,
       code: result.errorCode ?? ErrorCodes.FBR_UNEXPECTED_RESPONSE,
       message: result.errorMessage ?? 'FBR request failed.',

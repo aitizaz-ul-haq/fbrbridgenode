@@ -38,6 +38,12 @@ export interface FbrInvoice {
 export type BridgeAction = 'validate' | 'submit';
 
 /**
+ * FBR target environment. Selected per-request via the `X-FBR-Environment`
+ * header; the bridge picks the matching FBR endpoint and default token.
+ */
+export type FbrEnvironment = 'sandbox' | 'production';
+
+/**
  * The optional wrapper the caller may send. The bridge forwards only the
  * `invoice` object to FBR.
  */

@@ -10,12 +10,13 @@ vi.mock('../src/config/env.js', () => ({
     host: '127.0.0.1',
     fbrBaseUrl: 'https://gw.fbr.gov.pk/di_data/v1/di',
     fbrSandboxToken: 'test-token',
+    fbrProductionToken: 'test-prod-token',
     bridgeApiKey: 'test-bridge-api-key',
     allowedOrigins: ['https://app.example'],
     requestTimeoutMs: 5000,
     logLevel: 'silent',
     mockMode: false,
-    environmentLabel: 'sandbox',
+    defaultEnvironment: 'sandbox',
   },
 }));
 

@@ -1,5 +1,4 @@
-import { env } from '../config/env.js';
-import type { BridgeAction } from '../types/invoice.js';
+import type { BridgeAction, FbrEnvironment } from '../types/invoice.js';
 
 /**
  * Internal error codes surfaced by the bridge. See Section 17 of the spec.
@@ -22,7 +21,7 @@ export interface SuccessEnvelope {
   success: true;
   requestId: string;
   submissionId: string | null;
-  environment: 'sandbox';
+  environment: FbrEnvironment;
   action: BridgeAction;
   httpStatus: number;
   fbrResponse: unknown;
@@ -34,7 +33,7 @@ export interface ErrorEnvelope {
   success: false;
   requestId: string;
   submissionId: string | null;
-  environment: 'sandbox';
+  environment: FbrEnvironment;
   action: BridgeAction;
   httpStatus: number;
   error: {
@@ -51,6 +50,7 @@ export type BridgeEnvelope = SuccessEnvelope | ErrorEnvelope;
 interface EnvelopeBase {
   requestId: string;
   submissionId?: string | null;
+  environment: FbrEnvironment;
   action: BridgeAction;
   httpStatus: number;
   fbrResponse?: unknown;
@@ -62,7 +62,7 @@ export function buildSuccessEnvelope(base: EnvelopeBase): SuccessEnvelope {
     success: true,
     requestId: base.requestId,
     submissionId: base.submissionId ?? null,
-    environment: env.environmentLabel,
+    environment: base.environment,
     action: base.action,
     httpStatus: base.httpStatus,
     fbrResponse: base.fbrResponse ?? {},
@@ -78,7 +78,7 @@ export function buildErrorEnvelope(
     success: false,
     requestId: base.requestId,
     submissionId: base.submissionId ?? null,
-    environment: env.environmentLabel,
+    environment: base.environment,
     action: base.action,
     httpStatus: base.httpStatus,
     error: {

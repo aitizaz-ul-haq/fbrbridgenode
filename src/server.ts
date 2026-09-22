@@ -9,7 +9,7 @@ const server = app.listen(env.port, env.host, () => {
     {
       host: env.host,
       port: env.port,
-      environment: env.environmentLabel,
+      environment: env.defaultEnvironment,
       mockMode: env.mockMode,
     },
     'FBR bridge listening',

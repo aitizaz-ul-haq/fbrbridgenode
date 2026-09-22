@@ -7,7 +7,7 @@ healthRouter.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'ok',
     service: 'fbr-bridge',
-    environment: env.environmentLabel,
+    environment: env.defaultEnvironment,
     ...(env.mockMode ? { mock: true } : {}),
   });
 });
